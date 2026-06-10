@@ -1,0 +1,34 @@
+# Dependencias
+node_modules/
+/node_modules
+# Builds
+dist/
+*.AppImage
+
+# Asistentes de IA
+CLAUDE.md
+.claude/
+.agents/
+.codex/
+AGENTS.md
+GEMINI.md
+.cursor/
+.cursorrules
+.aider*
+.github/copilot-instructions.md
+
+# Entorno / archivos con rutas locales
+.env
+.env.*
+!.env.example
+TaskFlow.desktop
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
