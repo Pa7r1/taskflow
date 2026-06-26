@@ -62,6 +62,20 @@ export default function QuickAdd({ onSave, categories = [] }) {
   const noteBodyRef = useRef(null);
   const blankRef = useRef(null);
 
+  // El handler onFocusQuickAdd se registra una sola vez al montar; lee el modo
+  // y la selección vigentes desde refs para enfocar el input correcto al reabrir.
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const selectedTaskRef = useRef(selectedTask);
+  selectedTaskRef.current = selectedTask;
+
+  const focusMode = (m = modeRef.current) => {
+    if (m === "task") taskRef.current?.focus();
+    else if (m === "note")
+      (selectedTaskRef.current ? noteBodyRef : noteTitleRef).current?.focus();
+    else blankRef.current?.focus();
+  };
+
   const parsed = useMemo(
     () => parseQuickInput(taskValue, categories),
     [taskValue, categories],
@@ -90,10 +104,12 @@ export default function QuickAdd({ onSave, categories = [] }) {
   };
 
   useEffect(() => {
+    // Al reabrir el popup se conserva el borrador (el componente sigue montado
+    // mientras la ventana está oculta). main encoge la ventana al ocultarla, así
+    // que solo restauramos la altura del modo actual y reenfocamos su input.
     window.taskAPI?.onFocusQuickAdd?.(() => {
-      resetAll();
-      window.taskAPI?.resizeQuickAdd?.(HEIGHTS.task);
-      setTimeout(() => taskRef.current?.focus(), 50);
+      window.taskAPI?.resizeQuickAdd?.(HEIGHTS[modeRef.current]);
+      setTimeout(() => focusMode(), 50);
     });
   }, []);
 
@@ -101,11 +117,7 @@ export default function QuickAdd({ onSave, categories = [] }) {
     window.taskAPI?.resizeQuickAdd?.(HEIGHTS[mode]);
     if (mode === "note")
       window.taskAPI?.getTasks?.("pending").then(setPendingTasks);
-    const t = setTimeout(() => {
-      if (mode === "task") taskRef.current?.focus();
-      else if (mode === "note") noteTitleRef.current?.focus();
-      else blankRef.current?.focus();
-    }, 0);
+    const t = setTimeout(() => focusMode(mode), 0);
     return () => clearTimeout(t);
   }, [mode]);
 

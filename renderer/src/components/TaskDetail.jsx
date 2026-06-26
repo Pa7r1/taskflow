@@ -53,7 +53,7 @@ export default function TaskDetail({
       <textarea
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        onBlur={save}
+        onBlur={() => save()}
         rows={2}
         className="bg-transparent text-white text-base font-medium resize-none outline-none placeholder-white/20 leading-relaxed"
         placeholder="Título de la tarea"
@@ -67,7 +67,7 @@ export default function TaskDetail({
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          onBlur={save}
+          onBlur={() => save()}
           rows={6}
           placeholder="Notas, ideas, contexto..."
           className="w-full min-h-32 bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2.5 text-sm text-white/75 placeholder-white/25 resize-y outline-none leading-relaxed transition-all focus:border-indigo-500/40 focus:bg-white/[0.06] focus:ring-2 focus:ring-indigo-500/10"
