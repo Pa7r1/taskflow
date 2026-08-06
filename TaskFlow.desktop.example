@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=TaskFlow
+Name=__TASKFLOW_NAME__
 Comment=Gestor de tareas local
-Exec=__TASKFLOW_DIR__/scripts/launch-taskflow.sh
+Exec=__TASKFLOW_EXEC__
 Path=__TASKFLOW_DIR__
-Icon=__TASKFLOW_DIR__/assets/taskflow.svg
+Icon=__TASKFLOW_ICON__
 Terminal=false
 Categories=Utility;
 StartupNotify=true

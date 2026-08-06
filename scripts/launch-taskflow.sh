@@ -14,4 +14,4 @@ if [ -f .env ]; then
 fi
 
 export TASKFLOW_RENDERER_PORT="${TASKFLOW_RENDERER_PORT:-42879}"
-exec npm start
+exec pnpm start
