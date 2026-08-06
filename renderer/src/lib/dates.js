@@ -18,6 +18,13 @@ export function isOverdue(dateISO) {
   return daysFromToday(dateISO) < 0;
 }
 
+/** Fecha corta y absoluta ("3 ago"), para cuando "hace N días" no basta. */
+export function formatAbsolute(dateISO) {
+  const date = new Date(`${dateISO}T00:00:00`);
+  if (isNaN(date)) return dateISO;
+  return date.toLocaleDateString("es", { day: "numeric", month: "short" });
+}
+
 export function formatRelative(dateISO) {
   const diff = daysFromToday(dateISO);
   if (isNaN(diff)) return dateISO;

@@ -77,7 +77,11 @@ export default function parseQuickInput(text, categories = []) {
       const cat = categories.find((c) => normalize(c.name) === name);
       if (cat) {
         result.category_id = cat.id;
-        result.chips.push({ type: "category", label: cat.name, color: cat.color });
+        result.chips.push({
+          type: "category",
+          label: cat.name,
+          color: cat.color,
+        });
         continue;
       }
     }
@@ -85,7 +89,10 @@ export default function parseQuickInput(text, categories = []) {
     if (!result.due_date) {
       let due = null;
       if (tok === "hoy") due = addDays(0);
-      else if (tok === "pasado" && normalize(tokens[i + 1] || "") === "manana") {
+      else if (
+        tok === "pasado" &&
+        normalize(tokens[i + 1] || "") === "manana"
+      ) {
         due = addDays(2);
         i++;
       } else if (tok === "manana") due = addDays(1);
