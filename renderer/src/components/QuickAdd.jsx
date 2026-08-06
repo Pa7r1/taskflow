@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, FileText, StickyNote, X, Link2 } from "lucide-react";
-import parseQuickInput, { normalize } from "../lib/parseQuickInput";
+import { Plus, FileText, StickyNote } from "lucide-react";
+import parseQuickInput from "../lib/parseQuickInput";
+import parseBlankNote from "../lib/parseBlankNote";
+import QuickAddTask from "./quickadd/QuickAddTask";
+import QuickAddNote from "./quickadd/QuickAddNote";
+import QuickAddBlank from "./quickadd/QuickAddBlank";
 
 const MODES = [
   { id: "task", label: "Tarea", icon: Plus },
@@ -25,29 +29,10 @@ const EMPTY_TASK = {
   reminder_at: null,
 };
 
-function Chip({ chip }) {
-  const styles = {
-    priority:
-      chip.label === "Prioridad alta"
-        ? "bg-red-500/20 text-red-400"
-        : "bg-white/10 text-white/50",
-    date: "bg-indigo-500/20 text-indigo-300",
-    category: "text-white",
-  };
-  return (
-    <span
-      className={`text-[10px] px-2 py-0.5 rounded-full ${styles[chip.type]}`}
-      style={
-        chip.type === "category"
-          ? { backgroundColor: `${chip.color}40`, color: chip.color }
-          : undefined
-      }
-    >
-      {chip.label}
-    </span>
-  );
-}
-
+/**
+ * Chasis del popup de captura rápida: barra de modos, pie y guardado. Cada modo
+ * es su propio componente; aquí solo vive lo que comparten.
+ */
 export default function QuickAdd({ onSave, categories = [] }) {
   const [mode, setMode] = useState("task");
   const [taskValue, setTaskValue] = useState("");
@@ -56,14 +41,15 @@ export default function QuickAdd({ onSave, categories = [] }) {
   const [selectedTask, setSelectedTask] = useState(null);
   const [pendingTasks, setPendingTasks] = useState([]);
   const [blankBody, setBlankBody] = useState("");
+  const [error, setError] = useState(null);
 
   const taskRef = useRef(null);
   const noteTitleRef = useRef(null);
   const noteBodyRef = useRef(null);
   const blankRef = useRef(null);
 
-  // El handler onFocusQuickAdd se registra una sola vez al montar; lee el modo
-  // y la selección vigentes desde refs para enfocar el input correcto al reabrir.
+  // El handler de foco se registra una sola vez al montar; lee el modo y la
+  // selección vigentes desde refs para enfocar el input correcto al reabrir.
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const selectedTaskRef = useRef(selectedTask);
@@ -81,14 +67,6 @@ export default function QuickAdd({ onSave, categories = [] }) {
     [taskValue, categories],
   );
 
-  const suggestions = useMemo(() => {
-    const term = normalize(noteTitle.trim());
-    if (!term || term.length < 2 || selectedTask) return [];
-    return pendingTasks
-      .filter((t) => normalize(t.title).includes(term))
-      .slice(0, 4);
-  }, [noteTitle, pendingTasks, selectedTask]);
-
   const resetAll = () => {
     setMode("task");
     setTaskValue("");
@@ -96,6 +74,7 @@ export default function QuickAdd({ onSave, categories = [] }) {
     setNoteBody("");
     setSelectedTask(null);
     setBlankBody("");
+    setError(null);
   };
 
   const close = () => {
@@ -103,68 +82,94 @@ export default function QuickAdd({ onSave, categories = [] }) {
     window.taskAPI?.closeQuickAdd();
   };
 
+  // Solo se cierra la ventana si el guardado salió bien. Si falla, el borrador
+  // se conserva y el error se ve en el pie: perder lo escrito por un fallo de la
+  // base sería el peor desenlace posible.
+  //
+  // `accion` devuelve el registro guardado, o null si App capturó un error.
+  const guardar = async (accion) => {
+    try {
+      setError(null);
+      const guardado = await accion();
+      if (!guardado) {
+        setError("No se pudo guardar. Vuelve a intentarlo.");
+        return;
+      }
+      close();
+    } catch (e) {
+      setError(`No se pudo guardar: ${e.message}`);
+    }
+  };
+
   useEffect(() => {
     // Al reabrir el popup se conserva el borrador (el componente sigue montado
     // mientras la ventana está oculta). main encoge la ventana al ocultarla, así
     // que solo restauramos la altura del modo actual y reenfocamos su input.
-    window.taskAPI?.onFocusQuickAdd?.(() => {
+    let temporizador;
+    const desuscribir = window.taskAPI?.onFocusQuickAdd?.(() => {
       window.taskAPI?.resizeQuickAdd?.(HEIGHTS[modeRef.current]);
-      setTimeout(() => focusMode(), 50);
+      clearTimeout(temporizador);
+      temporizador = setTimeout(() => focusMode(), 50);
     });
+    return () => {
+      clearTimeout(temporizador);
+      desuscribir?.();
+    };
   }, []);
 
   useEffect(() => {
     window.taskAPI?.resizeQuickAdd?.(HEIGHTS[mode]);
+    let cancelado = false;
     if (mode === "note")
-      window.taskAPI?.getTasks?.("pending").then(setPendingTasks);
+      window.taskAPI
+        ?.getTasks?.("pending")
+        .then((tareas) => !cancelado && setPendingTasks(tareas))
+        .catch((e) => !cancelado && setError(e.message));
     const t = setTimeout(() => focusMode(mode), 0);
-    return () => clearTimeout(t);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
   }, [mode]);
 
-  const saveTask = async () => {
+  const saveTask = () => {
     if (!parsed.title.trim()) return;
-    await onSave({
-      ...EMPTY_TASK,
-      title: parsed.title.trim(),
-      priority: parsed.priority,
-      category_id: parsed.category_id,
-      due_date: parsed.due_date,
-    });
-    close();
+    return guardar(() =>
+      onSave({
+        ...EMPTY_TASK,
+        title: parsed.title.trim(),
+        priority: parsed.priority,
+        category_id: parsed.category_id,
+        due_date: parsed.due_date,
+      }),
+    );
   };
 
-  const saveNote = async () => {
-    const body = noteBody.trim();
+  const saveNote = () => {
+    const cuerpo = noteBody.trim();
     if (selectedTask) {
-      if (!body) return;
-      const merged = selectedTask.notes
-        ? `${selectedTask.notes}\n\n${body}`
-        : body;
-      await window.taskAPI.updateTask(selectedTask.id, { notes: merged });
-    } else {
-      if (!noteTitle.trim()) return;
-      await onSave({ ...EMPTY_TASK, title: noteTitle.trim(), notes: body });
+      if (!cuerpo) return;
+      const unido = selectedTask.notes
+        ? `${selectedTask.notes}\n\n${cuerpo}`
+        : cuerpo;
+      return guardar(() =>
+        window.taskAPI.updateTask(selectedTask.id, { notes: unido }),
+      );
     }
-    close();
+    if (!noteTitle.trim()) return;
+    return guardar(() =>
+      onSave({ ...EMPTY_TASK, title: noteTitle.trim(), notes: cuerpo }),
+    );
   };
 
-  const saveBlank = async () => {
-    const text = blankBody.trim();
-    if (!text) return;
-    const [firstLine, ...restLines] = text.split("\n");
-    const first = firstLine.trim();
-    const title =
-      first.slice(0, 60) ||
-      `Nota rápida — ${new Date().toLocaleDateString("es")}`;
-    // Si el título quedó truncado, conservar el texto completo en las notas
-    const notes =
-      first.length > 60 ? text : restLines.join("\n").trim();
-    await onSave({ ...EMPTY_TASK, title, notes });
-    close();
+  const saveBlank = () => {
+    const nota = parseBlankNote(blankBody);
+    if (!nota) return;
+    return guardar(() => onSave({ ...EMPTY_TASK, ...nota }));
   };
 
-  const saveCurrent = () =>
-    mode === "task" ? saveTask() : mode === "note" ? saveNote() : saveBlank();
+  const guardadores = { task: saveTask, note: saveNote, blank: saveBlank };
+  const saveCurrent = () => guardadores[mode]();
 
   const handleGlobalKeys = (e) => {
     if (e.key === "Escape") close();
@@ -177,16 +182,20 @@ export default function QuickAdd({ onSave, categories = [] }) {
   return (
     <div
       onKeyDown={handleGlobalKeys}
-      className="flex flex-col h-screen bg-[#1a1a2e] border border-indigo-500/20 rounded-xl overflow-hidden"
+      className="flex flex-col h-screen bg-popup border border-indigo-500/20 rounded-xl overflow-hidden"
     >
       {/* Selector de modo (zona arrastrable de la ventana sin marco) */}
       <div
         className="flex items-center gap-1 px-2 pt-2 shrink-0"
         style={{ WebkitAppRegion: "drag" }}
+        role="tablist"
+        aria-label="Modo de captura"
       >
         {MODES.map(({ id, label, icon: Icon }, i) => (
           <button
             key={id}
+            role="tab"
+            aria-selected={mode === id}
             onClick={() => setMode(id)}
             title={`Ctrl+${i + 1}`}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] transition-all ${
@@ -201,106 +210,51 @@ export default function QuickAdd({ onSave, categories = [] }) {
         ))}
       </div>
 
-      {/* Contenido según modo */}
       {mode === "task" && (
-        <div className="flex-1 flex flex-col px-4 min-h-0">
-          <div className="flex-1 flex items-center gap-3">
-            <Plus size={18} className="text-indigo-400 shrink-0" />
-            <input
-              ref={taskRef}
-              value={taskValue}
-              onChange={(e) => setTaskValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && saveTask()}
-              placeholder="¿Qué tienes en mente?"
-              className="flex-1 bg-transparent text-white text-sm outline-none placeholder-white/30"
-            />
-          </div>
-          {parsed.chips.length > 0 && (
-            <div className="flex gap-1.5 pb-1.5 shrink-0">
-              {parsed.chips.map((chip, i) => (
-                <Chip key={i} chip={chip} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {mode === "note" && (
-        <div className="flex-1 flex flex-col gap-2 px-4 py-2 min-h-0">
-          {selectedTask ? (
-            <div className="flex items-center gap-2 bg-indigo-500/15 border border-indigo-500/25 rounded-lg px-3 py-1.5 text-xs text-indigo-300 shrink-0">
-              <Link2 size={12} className="shrink-0" />
-              <span className="truncate flex-1">
-                Anexar a: {selectedTask.title}
-              </span>
-              <button
-                onClick={() => setSelectedTask(null)}
-                className="text-indigo-300/60 hover:text-indigo-300 shrink-0"
-              >
-                <X size={12} />
-              </button>
-            </div>
-          ) : (
-            <div className="relative shrink-0">
-              <input
-                ref={noteTitleRef}
-                value={noteTitle}
-                onChange={(e) => setNoteTitle(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && noteBodyRef.current?.focus()
-                }
-                placeholder="Título nuevo o buscar tarea existente..."
-                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none placeholder-white/30 focus:border-indigo-500/40"
-              />
-              {suggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 z-10 bg-[#22223a] border border-white/10 rounded-lg overflow-hidden shadow-xl">
-                  {suggestions.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => {
-                        setSelectedTask(t);
-                        setTimeout(() => noteBodyRef.current?.focus(), 0);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs text-white/70 hover:bg-indigo-500/20 hover:text-white truncate"
-                    >
-                      {t.title}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          <textarea
-            ref={noteBodyRef}
-            value={noteBody}
-            onChange={(e) => setNoteBody(e.target.value)}
-            onKeyDown={(e) =>
-              (e.ctrlKey || e.metaKey) && e.key === "Enter" && saveNote()
-            }
-            placeholder="Escribe la nota, detalles, contexto..."
-            className="flex-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/80 outline-none placeholder-white/25 resize-none leading-relaxed focus:border-indigo-500/40"
-          />
-        </div>
-      )}
-
-      {mode === "blank" && (
-        <textarea
-          ref={blankRef}
-          value={blankBody}
-          onChange={(e) => setBlankBody(e.target.value)}
-          onKeyDown={(e) =>
-            (e.ctrlKey || e.metaKey) && e.key === "Enter" && saveBlank()
-          }
-          placeholder={
-            "Escribe libremente...\nLa primera línea será el título de la nota."
-          }
-          className="flex-1 mx-4 my-2 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/80 outline-none placeholder-white/25 resize-none leading-relaxed focus:border-indigo-500/40"
+        <QuickAddTask
+          valor={taskValue}
+          onChange={setTaskValue}
+          parsed={parsed}
+          onGuardar={saveTask}
+          inputRef={taskRef}
         />
       )}
 
-      {/* Pie: ayuda + guardar */}
+      {mode === "note" && (
+        <QuickAddNote
+          titulo={noteTitle}
+          onTituloChange={setNoteTitle}
+          cuerpo={noteBody}
+          onCuerpoChange={setNoteBody}
+          tareaElegida={selectedTask}
+          onElegirTarea={(t) => {
+            setSelectedTask(t);
+            if (t) setTimeout(() => noteBodyRef.current?.focus(), 0);
+          }}
+          tareasPendientes={pendingTasks}
+          onGuardar={saveNote}
+          tituloRef={noteTitleRef}
+          cuerpoRef={noteBodyRef}
+        />
+      )}
+
+      {mode === "blank" && (
+        <QuickAddBlank
+          valor={blankBody}
+          onChange={setBlankBody}
+          onGuardar={saveBlank}
+          inputRef={blankRef}
+        />
+      )}
+
+      {/* Pie: ayuda (o el error) + guardar */}
       <div className="flex items-center justify-between px-4 pb-2 shrink-0">
-        <span className="text-[10px] text-white/25">{HINTS[mode]}</span>
+        <span
+          role={error ? "alert" : undefined}
+          className={`text-[10px] ${error ? "text-red-400" : "text-white/25"}`}
+        >
+          {error || HINTS[mode]}
+        </span>
         <button
           onClick={saveCurrent}
           className="text-[11px] px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 transition-all"

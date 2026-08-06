@@ -7,6 +7,7 @@ dist/
 
 # Asistentes de IA
 CLAUDE.md
+MEMORY.md
 .claude/
 .agents/
 .codex/

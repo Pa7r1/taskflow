@@ -14,37 +14,40 @@ export default function Sidebar({
   filter,
   setFilter,
   categories,
-  tasks,
-  onNewCategory,
+  counts,
+  onCreateCategory,
 }) {
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState(COLORS[0]);
 
-  const pending = tasks.filter((t) => !t.completed).length;
-  const today = tasks.filter(
-    (t) =>
-      !t.completed &&
-      (t.due_date === new Date().toISOString().split("T")[0] || !t.due_date),
-  ).length;
-
+  // Los contadores llegan calculados en SQL sobre la tabla entera. Deducirlos de
+  // `tasks` daba cifras falsas: esa lista es solo la del filtro que se ve.
   const navItems = [
-    { id: "today", label: "Hoy", icon: Sun, count: today },
-    { id: "pending", label: "Pendientes", icon: Inbox, count: pending },
+    { id: "today", label: "Hoy", icon: Sun, count: counts.hoy },
+    {
+      id: "pending",
+      label: "Pendientes",
+      icon: Inbox,
+      count: counts.pendientes,
+      // Las vencidas viven aquí, así que se anuncian aquí.
+      overdue: counts.vencidas,
+    },
     { id: "all", label: "Todas", icon: List },
     { id: "completed", label: "Completadas", icon: CheckSquare },
   ];
 
+  // La lista de categorías se refresca sola: crear una emite `data:changed` desde
+  // el proceso main, y App recarga por ese evento.
   const handleAddCategory = async () => {
     if (!newName.trim()) return;
-    await window.taskAPI.createCategory(newName.trim(), newColor);
+    await onCreateCategory(newName.trim(), newColor);
     setNewName("");
     setAdding(false);
-    onNewCategory();
   };
 
   return (
-    <aside className="w-56 bg-[#13131a] flex flex-col py-10 px-3 gap-1 border-r border-white/5 shrink-0">
+    <aside className="w-56 bg-panel flex flex-col py-10 px-3 gap-1 border-r border-white/5 shrink-0">
       <div className="px-3 mb-6">
         <h1 className="text-lg font-bold text-white tracking-tight">
           TaskFlow
@@ -55,7 +58,7 @@ export default function Sidebar({
       </div>
 
       <nav className="flex flex-col gap-0.5">
-        {navItems.map(({ id, label, icon: Icon, count }) => (
+        {navItems.map(({ id, label, icon: Icon, count, overdue }) => (
           <button
             key={id}
             onClick={() => setFilter(id)}
@@ -67,7 +70,15 @@ export default function Sidebar({
           >
             <Icon size={15} />
             <span className="flex-1 text-left">{label}</span>
-            {count !== undefined && count > 0 && (
+            {overdue > 0 && (
+              <span
+                title={`${overdue} vencida${overdue > 1 ? "s" : ""}`}
+                className="text-xs bg-red-500/20 text-red-400 rounded-full px-1.5 py-0.5"
+              >
+                {overdue}
+              </span>
+            )}
+            {count > 0 && (
               <span className="text-xs bg-white/10 rounded-full px-1.5 py-0.5">
                 {count}
               </span>
