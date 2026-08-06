@@ -2,21 +2,26 @@
   "name": "taskflow",
   "version": "1.0.0",
   "description": "Gestor de tareas local",
+  "author": "Pa7r1",
   "main": "main/main.js",
   "scripts": {
-    "start": "concurrently \"npm run dev:renderer\" \"wait-on http://127.0.0.1:42879 && env -u ELECTRON_RUN_AS_NODE electron .\"",
-    "dev:renderer": "cd renderer && npm run dev",
-    "build:renderer": "cd renderer && npm run build",
-    "build": "npm run build:renderer && electron-builder"
+    "start": "concurrently \"pnpm run dev:renderer\" \"wait-on http://127.0.0.1:42879 && env -u ELECTRON_RUN_AS_NODE electron .\"",
+    "dev:renderer": "pnpm --filter taskflow-renderer dev",
+    "build:renderer": "pnpm --filter taskflow-renderer build",
+    "build": "pnpm run build:renderer && electron-builder",
+    "test": "pnpm --filter taskflow-renderer test",
+    "format": "prettier --write .",
+    "postinstall": "electron-builder install-app-deps",
+    "rebuild:native": "electron-builder install-app-deps"
   },
   "dependencies": {
-    "better-sqlite3": "^12.9.0"
+    "better-sqlite3": "^13.0.3"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "electron": "28.3.3",
+    "electron": "^43.3.0",
     "electron-builder": "^26.8.1",
-    "electron-rebuild": "^3.2.9",
+    "prettier": "^3.9.6",
     "wait-on": "^7.2.0"
   },
   "build": {
@@ -25,16 +30,22 @@
     "files": [
       "main/**/*",
       "renderer/dist/**/*",
-      "preload.js"
+      "preload.js",
+      "assets/**/*"
     ],
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "icon": "assets/icon.png",
+      "category": "Utility"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "assets/icon.png"
     },
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "icon": "assets/icon.png"
     }
-  }
+  },
+  "packageManager": "pnpm@10.17.1"
 }
