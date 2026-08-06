@@ -12,12 +12,13 @@ Hecho con Electron, React, Vite y Tailwind.
   - **Nota en blanco**: una hoja libre; la primera línea se convierte en el título.
 - **Sintaxis rápida**: `Llamar al banco mañana !alta #trabajo` detecta fecha, prioridad y categoría al escribir. Soporta `hoy`, `mañana`, `pasado mañana`, días de la semana, `dd/mm`, `!alta`/`!baja` y `#categoría`.
 - **Recordatorios del sistema**: notificaciones nativas que sobreviven reinicios de la app, más un resumen diario a las 9 am con lo que vence.
-- **Organización**: categorías con color, prioridades, fechas límite con vista relativa ("mañana", "hace 2 días") y filtros (Hoy, Pendientes, Todas, Completadas).
+- **Organización**: categorías con color, prioridades, fechas límite con vista relativa ("mañana", "hace 2 días") y filtros (Hoy, Pendientes, Todas, Completadas). "Hoy" muestra solo lo que vence hoy; lo vencido y lo que no tiene fecha se recoge en "Pendientes", con las vencidas arriba y la fecha en que se pasaron.
 - La app vive en la bandeja del sistema: cerrar la ventana no la detiene.
 
 ## Requisitos
 
-- [Node.js](https://nodejs.org) 18 o superior (incluye npm)
+- [Node.js](https://nodejs.org) 22.12 o superior (lo pide Electron 43)
+- [pnpm](https://pnpm.io) 10 o superior — `corepack enable pnpm` si ya tenés Node
 - Git
 
 ## Descarga
@@ -29,19 +30,22 @@ cd taskflow
 
 ## Instalación
 
-El proyecto tiene dos paquetes: la raíz (Electron) y `renderer/` (la interfaz). Hay que instalar dependencias en ambos:
+El proyecto es un workspace de pnpm con dos paquetes: la raíz (Electron) y `renderer/` (la interfaz). Un solo comando instala los dos:
 
 ```bash
-npm install
-cd renderer && npm install && cd ..
+pnpm install
 ```
 
-> **Nota**: si al arrancar aparece un error `NODE_MODULE_VERSION` relacionado con `better-sqlite3`, ejecutá `npx electron-rebuild` en la raíz. Eso recompila el módulo de la base de datos contra la versión de Electron del proyecto.
+`better-sqlite3` se compila contra el ABI de Electron, no contra el Node del sistema. El script `postinstall` lo recompila solo, así que **no hace falta ningún paso manual**. Si alguna vez aparece un error `NODE_MODULE_VERSION`, forzalo con:
+
+```bash
+pnpm run rebuild:native
+```
 
 ## Ejecutar en desarrollo
 
 ```bash
-npm start
+pnpm start
 ```
 
 Levanta el servidor de Vite y abre la app de Electron cuando está listo. La ventana principal puede cerrarse; la app queda en la bandeja y el atajo `Ctrl+Shift+Space` sigue funcionando.
@@ -49,16 +53,24 @@ Levanta el servidor de Vite y abre la app de Electron cuando está listo. La ven
 ## Empaquetar para tu sistema
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 Genera el instalador según el sistema operativo donde lo ejecutes:
 
-| Sistema | Salida |
-|---------|--------|
-| Linux   | AppImage en `dist/` |
+| Sistema | Salida                     |
+| ------- | -------------------------- |
+| Linux   | AppImage en `dist/`        |
 | Windows | Instalador NSIS en `dist/` |
-| macOS   | DMG en `dist/` |
+| macOS   | DMG en `dist/`             |
+
+## Tests
+
+```bash
+pnpm test
+```
+
+Cubren la lógica pura del renderer: interpretación de la sintaxis rápida, cálculo de fechas y construcción de notas.
 
 ## Configuración (opcional)
 
