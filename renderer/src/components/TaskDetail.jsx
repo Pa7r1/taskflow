@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Trash2, Bell, Calendar, Tag, FileText } from "lucide-react";
 
 const PRIORIDADES = [
@@ -24,7 +24,7 @@ const CAMPO =
 
 function Etiqueta({ icon: Icon, children }) {
   return (
-    <span className="text-xs text-white/30 mb-2 flex items-center gap-1.5">
+    <span className="text-xs text-white/60 mb-2 flex items-center gap-1.5">
       {Icon && <Icon size={12} />} {children}
     </span>
   );
@@ -51,6 +51,11 @@ export default function TaskDetail({
   const [dueDate, setDueDate] = useState(task.due_date || "");
   const [categoryId, setCategoryId] = useState(task.category_id || "");
   const [reminderAt, setReminderAt] = useState(task.reminder_at || "");
+  const titleRef = useRef(null);
+
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
 
   // Los campos de texto guardan al perder el foco; los selectores, al elegir.
   // `overrides` evita depender de que el estado ya se haya actualizado.
@@ -66,27 +71,33 @@ export default function TaskDetail({
     });
 
   return (
-    <aside className="w-80 bg-panel border-l border-white/5 flex flex-col p-6 gap-5 overflow-y-auto shrink-0">
+    <aside
+      className="flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto border-l border-white/5 bg-panel p-5 lg:w-80 lg:flex-none lg:p-6 [&>*]:shrink-0"
+      data-smoke="task-detail"
+    >
       <div className="flex items-center justify-between">
-        <span className="text-xs text-white/30 uppercase tracking-wider">
+        <span className="text-xs text-white/50 uppercase tracking-wider">
           Detalle
         </span>
         <button
           onClick={onClose}
           aria-label="Cerrar detalle"
-          className="text-white/30 hover:text-white/70 transition-colors"
+          className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-white/60 transition-colors hover:border-white/20 hover:text-white/80"
         >
+          <span className="lg:hidden">Volver a tareas</span>
+          <span className="hidden lg:inline">Cerrar detalle</span>
           <X size={15} />
         </button>
       </div>
 
       <textarea
+        ref={titleRef}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onBlur={() => guardar()}
         rows={2}
         aria-label="Título de la tarea"
-        className="bg-transparent text-white text-base font-medium resize-none outline-none placeholder-white/20 leading-relaxed"
+        className="bg-transparent text-lg font-semibold leading-relaxed text-white placeholder-white/20 resize-none outline-none focus:ring-2 focus:ring-indigo-500/20 rounded-lg"
         placeholder="Título de la tarea"
       />
 
@@ -175,7 +186,7 @@ export default function TaskDetail({
 
       <button
         onClick={() => onDelete(task.id)}
-        className="mt-auto flex items-center gap-2 text-xs text-red-400/60 hover:text-red-400 transition-colors"
+        className="mt-auto flex items-center gap-2 rounded-lg px-1 py-2 text-xs text-red-400/65 hover:text-red-300 transition-colors"
       >
         <Trash2 size={13} /> Eliminar tarea
       </button>

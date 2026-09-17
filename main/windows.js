@@ -37,6 +37,8 @@ function marcarQueSeSale() {
 // ─── Ventana principal ─────────────────────────────────────────────────────
 
 function createMainWindow() {
+  if (mainWindow) return showMainWindow();
+
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 720,
@@ -68,6 +70,7 @@ function createMainWindow() {
 
 function showMainWindow() {
   if (!mainWindow) return createMainWindow();
+  if (mainWindow.isMinimized()) mainWindow.restore();
   mainWindow.show();
   mainWindow.focus();
   return mainWindow;

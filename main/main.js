@@ -7,54 +7,72 @@
 //   ipc.js        — todos los handlers del puente con el renderer
 //   db/           — única puerta a SQLite
 
-const {
-  app,
-  BrowserWindow,
-  globalShortcut,
-  powerMonitor,
-} = require("electron");
-const db = require("./db");
-const recordatorios = require("./reminders");
-const { registrarHandlers } = require("./ipc");
-const { createTray, destroyTray } = require("./tray");
-const {
-  ATAJO_QUICKADD,
-  createMainWindow,
-  showQuickAdd,
-  marcarQueSeSale,
-} = require("./windows");
+const { app, globalShortcut, powerMonitor } = require("electron");
 
-app.whenReady().then(() => {
-  registrarHandlers();
-  createMainWindow();
-  createTray();
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
-  globalShortcut.register(ATAJO_QUICKADD, showQuickAdd);
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  const db = require("./db");
+  const recordatorios = require("./reminders");
+  const { registrarHandlers } = require("./ipc");
+  const { createTray, destroyTray } = require("./tray");
+  const {
+    ATAJO_QUICKADD,
+    createMainWindow,
+    showMainWindow,
+    showQuickAdd,
+    marcarQueSeSale,
+  } = require("./windows");
 
-  recordatorios.restaurar();
-  recordatorios.programarResumenDiario();
+  let mostrarPrincipalAlEstarListo = false;
 
-  // Al despertar de una suspensión los temporizadores llevan retraso: se
-  // reconstruyen todos contra el reloj real.
-  powerMonitor.on("resume", () => {
+  function mostrarPrincipalSeguro() {
+    if (typeof app.isReady === "function" && !app.isReady()) {
+      mostrarPrincipalAlEstarListo = true;
+      return;
+    }
+    showMainWindow();
+  }
+
+  app.on("second-instance", mostrarPrincipalSeguro);
+
+  app.whenReady().then(() => {
+    registrarHandlers();
+    createMainWindow();
+    createTray();
+
+    globalShortcut.register(ATAJO_QUICKADD, showQuickAdd);
+
     recordatorios.restaurar();
     recordatorios.programarResumenDiario();
+
+    // Al despertar de una suspensión los temporizadores llevan retraso: se
+    // reconstruyen todos contra el reloj real.
+    powerMonitor.on("resume", () => {
+      recordatorios.restaurar();
+      recordatorios.programarResumenDiario();
+    });
+
+    if (mostrarPrincipalAlEstarListo) {
+      mostrarPrincipalAlEstarListo = false;
+      showMainWindow();
+    }
+
+    app.on("activate", showMainWindow);
   });
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+  // La app no muere al cerrar la última ventana: vive en la bandeja hasta que se
+  // pulse "Salir". En macOS ese ya era el comportamiento esperado.
+  app.on("window-all-closed", () => {});
+
+  app.on("before-quit", marcarQueSeSale);
+
+  app.on("will-quit", () => {
+    globalShortcut.unregisterAll();
+    recordatorios.cancelarTodos();
+    destroyTray();
+    db.close();
   });
-});
-
-// La app no muere al cerrar la última ventana: vive en la bandeja hasta que se
-// pulse "Salir". En macOS ese ya era el comportamiento esperado.
-app.on("window-all-closed", () => {});
-
-app.on("before-quit", marcarQueSeSale);
-
-app.on("will-quit", () => {
-  globalShortcut.unregisterAll();
-  recordatorios.cancelarTodos();
-  destroyTray();
-  db.close();
-});
+}
