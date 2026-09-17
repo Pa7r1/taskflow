@@ -9,10 +9,11 @@
     "dev:renderer": "pnpm --filter taskflow-renderer dev",
     "build:renderer": "pnpm --filter taskflow-renderer build",
     "build": "pnpm run build:renderer && electron-builder",
-    "test": "pnpm --filter taskflow-renderer test",
+    "test": "pnpm run test:main && pnpm --filter taskflow-renderer test",
     "format": "prettier --write .",
     "postinstall": "electron-builder install-app-deps",
-    "rebuild:native": "electron-builder install-app-deps"
+    "rebuild:native": "electron-builder install-app-deps",
+    "test:main": "node --test tests/single-instance.test.cjs"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3"

@@ -47,8 +47,8 @@ export default function Sidebar({
   };
 
   return (
-    <aside className="w-56 bg-panel flex flex-col py-10 px-3 gap-1 border-r border-white/5 shrink-0">
-      <div className="px-3 mb-6">
+    <aside className="w-52 bg-panel flex flex-col py-6 px-3 gap-1 border-r border-white/5 shrink-0 sm:w-56 lg:py-8">
+      <div className="px-3 mb-5">
         <h1 className="text-lg font-bold text-white tracking-tight">
           TaskFlow
         </h1>
@@ -62,9 +62,9 @@ export default function Sidebar({
           <button
             key={id}
             onClick={() => setFilter(id)}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 ${
               filter === id
-                ? "bg-indigo-500/20 text-indigo-300"
+                ? "bg-indigo-500/20 text-indigo-200 shadow-[inset_3px_0_0_rgba(129,140,248,0.8)]"
                 : "text-white/50 hover:bg-white/5 hover:text-white/80"
             }`}
           >
@@ -133,7 +133,7 @@ export default function Sidebar({
           <button
             key={cat.id}
             onClick={() => setFilter(String(cat.id))}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 ${
               filter === String(cat.id)
                 ? "bg-white/10 text-white"
                 : "text-white/50 hover:bg-white/5 hover:text-white/70"

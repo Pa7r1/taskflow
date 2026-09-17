@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AlertTriangle } from "lucide-react";
 import Sidebar from "./components/Sidebar";
 import TaskList from "./components/TaskList";
 import TaskDetail from "./components/TaskDetail";
 import QuickAdd from "./components/QuickAdd";
+import { createReloadScheduler } from "./lib/createReloadScheduler";
 
 const isQuickAdd =
   new URLSearchParams(window.location.search).get("mode") === "quickadd";
@@ -19,6 +20,7 @@ export default function App() {
   const [counts, setCounts] = useState({ pendientes: 0, hoy: 0, vencidas: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const listFocusRef = useRef(null);
 
   // Único camino de recarga de datos.
   //
@@ -26,6 +28,11 @@ export default function App() {
   // y es ese evento —no la mutación— el que dispara la recarga. Así el popup quick-add
   // y la ventana principal se refrescan por el mismo mecanismo, y una mutación cuesta
   // una consulta en vez de dos.
+  //
+  // El scheduler evita recargas superpuestas o redundantes: como mucho una consulta
+  // en vuelo y como mucho una recarga trailing pendiente por ráfaga de eventos. Con
+  // la ventana oculta (minimizada o en la bandeja) no arranca ninguna consulta nueva
+  // —la que ya estaba en vuelo termina igual—, y siempre recarga al volver a mostrarse.
   //
   // El efecto se resuscribe al cambiar el filtro, de modo que el handler siempre lee
   // el filtro vigente sin necesidad de un ref.
@@ -54,24 +61,58 @@ export default function App() {
       }
     };
 
-    cargar();
-    const desuscribir = window.taskAPI.onDataChanged(cargar);
+    const scheduler = createReloadScheduler({
+      load: cargar,
+      initialVisible: document.visibilityState === "visible",
+    });
+    scheduler.request();
+    const desuscribir = window.taskAPI.onDataChanged(() => scheduler.request());
+    const onVisibilityChange = () =>
+      scheduler.setVisible(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       cancelado = true;
       desuscribir();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      scheduler.dispose();
     };
   }, [filter]);
 
   // El popup quick-add no muestra la lista, pero necesita las categorías para
-  // interpretar los #tokens del input.
+  // interpretar los #tokens del input. El popup se oculta y se muestra de nuevo
+  // sin desmontarse (conserva el borrador), así que sus categorías también
+  // necesitan el mismo camino de recarga: si no, quedan congeladas en las que
+  // había al arrancar la app.
   useEffect(() => {
     if (!isQuickAdd) return;
-    window.taskAPI
-      .getCategories()
-      .then(setCategories)
-      .catch((e) =>
-        setError(`No se pudieron cargar las categorías: ${e.message}`),
-      );
+    let cancelado = false;
+
+    const cargar = async () => {
+      try {
+        const nuevasCategorias = await window.taskAPI.getCategories();
+        if (cancelado) return;
+        setCategories(nuevasCategorias);
+      } catch (e) {
+        if (!cancelado)
+          setError(`No se pudieron cargar las categorías: ${e.message}`);
+      }
+    };
+
+    const scheduler = createReloadScheduler({
+      load: cargar,
+      initialVisible: document.visibilityState === "visible",
+    });
+    scheduler.request();
+    const desuscribir = window.taskAPI.onDataChanged(() => scheduler.request());
+    const onVisibilityChange = () =>
+      scheduler.setVisible(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      cancelado = true;
+      desuscribir();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      scheduler.dispose();
+    };
   }, []);
 
   // Envuelve una mutación para que un fallo se vea en pantalla en vez de dejar
@@ -104,8 +145,13 @@ export default function App() {
   const handleUpdate = (id, data) =>
     mutar(async () => {
       const actualizada = await window.taskAPI.updateTask(id, data);
-      setSelectedTask(actualizada);
+      setSelectedTask((actual) => (actual?.id === id ? actualizada : actual));
     }, "No se pudo guardar la tarea");
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedTask(null);
+    requestAnimationFrame(() => listFocusRef.current?.focus());
+  }, []);
 
   const handleCreateCategory = (name, color) =>
     mutar(
@@ -155,6 +201,9 @@ export default function App() {
           selectedId={selectedTask?.id}
           onQuickCreate={handleCreate}
           categories={categories}
+          counts={counts}
+          listFocusRef={listFocusRef}
+          detailOpen={Boolean(selectedTask)}
         />
 
         {/* La `key` remonta el panel al cambiar de tarea, y con él su estado
@@ -166,7 +215,7 @@ export default function App() {
             categories={categories}
             onUpdate={handleUpdate}
             onDelete={handleDelete}
-            onClose={() => setSelectedTask(null)}
+            onClose={handleCloseDetail}
           />
         )}
       </div>

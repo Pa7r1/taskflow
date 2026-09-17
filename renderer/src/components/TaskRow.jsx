@@ -28,10 +28,10 @@ export default function TaskRow({ task, seleccionada, onToggle, onSelect }) {
       type="button"
       onClick={() => onSelect(task)}
       aria-pressed={seleccionada}
-      className={`task-enter w-full text-left flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all border focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 ${
+      className={`task-enter w-full text-left flex items-start gap-3 rounded-2xl border px-4 py-3.5 cursor-pointer transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 ${
         seleccionada
-          ? "bg-indigo-500/15 border-indigo-500/30"
-          : "bg-white/3 border-transparent hover:bg-white/6 hover:border-white/8"
+          ? "border-indigo-400/45 bg-indigo-500/[0.18] shadow-[inset_3px_0_0_rgba(129,140,248,0.85)]"
+          : "border-white/[0.035] bg-white/[0.035] hover:border-white/10 hover:bg-white/[0.065]"
       }`}
     >
       <span
@@ -51,7 +51,7 @@ export default function TaskRow({ task, seleccionada, onToggle, onSelect }) {
           e.stopPropagation();
           onToggle(task.id);
         }}
-        className="shrink-0 transition-all hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 rounded-full"
+        className="mt-0.5 shrink-0 transition-all hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 rounded-full"
       >
         {task.completed ? (
           <CheckCircle2 size={18} className="text-indigo-400" />
@@ -62,8 +62,8 @@ export default function TaskRow({ task, seleccionada, onToggle, onSelect }) {
 
       <span className="flex-1 min-w-0">
         <p
-          className={`text-sm truncate ${
-            task.completed ? "line-through text-white/30" : "text-white/85"
+          className={`text-[15px] truncate leading-5 ${
+            task.completed ? "line-through text-white/30" : "text-white/90"
           }`}
         >
           {task.title}
@@ -76,7 +76,7 @@ export default function TaskRow({ task, seleccionada, onToggle, onSelect }) {
           <span
             style={{ backgroundColor: task.category_color }}
             title={task.category_name}
-            className="w-1.5 h-1.5 rounded-full"
+            className="h-2 w-2 rounded-full ring-2 ring-white/10"
           />
         )}
         {task.priority === "high" && (
